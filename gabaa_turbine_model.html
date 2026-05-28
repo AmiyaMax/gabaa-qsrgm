@@ -1,0 +1,1238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GABA-A Quantum Turbine Model</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Cinzel:wght@400;700&display=swap');
+
+  :root {
+    --bg: #030a0f;
+    --panel: #060f18;
+    --border: #0d3a52;
+    --accent: #00d4ff;
+    --accent2: #ff6b35;
+    --accent3: #7fff6b;
+    --accent4: #c87eff;
+    --accent5: #ffdd57;
+    --text: #a8d8ea;
+    --dim: #3a6070;
+    --glow: 0 0 12px rgba(0,212,255,0.5);
+    --glow2: 0 0 12px rgba(255,107,53,0.5);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Share Tech Mono', monospace;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Animated background grid */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(0,212,255,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,212,255,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .container {
+    position: relative;
+    z-index: 1;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+  }
+
+  header {
+    text-align: center;
+    padding: 20px 0 16px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 20px;
+  }
+
+  header h1 {
+    font-family: 'Cinzel', serif;
+    font-size: clamp(1.1rem, 3vw, 1.8rem);
+    color: var(--accent);
+    text-shadow: var(--glow);
+    letter-spacing: 2px;
+  }
+
+  header p {
+    font-size: 0.72rem;
+    color: var(--dim);
+    margin-top: 6px;
+    letter-spacing: 1px;
+  }
+
+  .main-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+
+  @media (max-width: 700px) {
+    .main-grid { grid-template-columns: 1fr; }
+  }
+
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 14px;
+  }
+
+  .panel-title {
+    font-size: 0.68rem;
+    letter-spacing: 2px;
+    color: var(--accent);
+    text-transform: uppercase;
+    margin-bottom: 12px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  /* Canvas panel */
+  .canvas-panel {
+    grid-column: 1 / -1;
+    display: flex;
+    gap: 16px;
+    align-items: flex-start;
+  }
+
+  @media (max-width: 700px) {
+    .canvas-panel { flex-direction: column; }
+  }
+
+  canvas {
+    display: block;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: #020810;
+  }
+
+  #turbineCanvas { width: 100%; max-width: 340px; height: 340px; }
+  #spirographCanvas { width: 100%; max-width: 300px; height: 300px; }
+
+  /* Controls */
+  .controls-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+
+  .ligand-control {
+    background: rgba(0,0,0,0.3);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 10px;
+  }
+
+  .ligand-control label {
+    display: block;
+    font-size: 0.65rem;
+    letter-spacing: 1px;
+    margin-bottom: 6px;
+  }
+
+  .ligand-control input[type=range] {
+    width: 100%;
+    -webkit-appearance: none;
+    height: 3px;
+    border-radius: 2px;
+    outline: none;
+    cursor: pointer;
+  }
+
+  .ligand-control .val {
+    font-size: 0.7rem;
+    text-align: right;
+    margin-top: 3px;
+  }
+
+  input[type=range].gaba    { background: linear-gradient(to right, var(--accent) 0%, var(--accent) var(--pct, 50%), #1a3040 var(--pct, 50%)); }
+  input[type=range].benzo   { background: linear-gradient(to right, var(--accent4) 0%, var(--accent4) var(--pct, 0%), #1a3040 var(--pct, 0%)); }
+  input[type=range].barb    { background: linear-gradient(to right, var(--accent2) 0%, var(--accent2) var(--pct, 0%), #1a3040 var(--pct, 0%)); }
+  input[type=range].neuro   { background: linear-gradient(to right, var(--accent3) 0%, var(--accent3) var(--pct, 0%), #1a3040 var(--pct, 0%)); }
+  input[type=range].zinc    { background: linear-gradient(to right, #888 0%, #888 var(--pct, 0%), #1a3040 var(--pct, 0%)); }
+  input[type=range].inverse { background: linear-gradient(to right, #ff3060 0%, #ff3060 var(--pct, 0%), #1a3040 var(--pct, 0%)); }
+
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 12px; height: 12px;
+    border-radius: 50%;
+    background: white;
+    cursor: pointer;
+  }
+
+  /* Metrics */
+  .metrics-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    margin-top: 0;
+  }
+
+  .metric {
+    background: rgba(0,0,0,0.4);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 8px;
+    text-align: center;
+  }
+
+  .metric .label {
+    font-size: 0.58rem;
+    color: var(--dim);
+    letter-spacing: 1px;
+    display: block;
+    margin-bottom: 4px;
+  }
+
+  .metric .value {
+    font-size: 1.1rem;
+    font-weight: bold;
+  }
+
+  /* State bar */
+  .state-bar {
+    display: flex;
+    gap: 4px;
+    margin-top: 10px;
+    height: 8px;
+  }
+
+  .state-seg {
+    border-radius: 2px;
+    height: 100%;
+    transition: width 0.3s ease;
+  }
+
+  .state-labels {
+    display: flex;
+    gap: 4px;
+    margin-top: 4px;
+    font-size: 0.55rem;
+    color: var(--dim);
+    flex-wrap: wrap;
+  }
+
+  .state-dot {
+    display: inline-block;
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    margin-right: 3px;
+    vertical-align: middle;
+  }
+
+  /* Hypothesis log */
+  #hypothesisLog {
+    height: 160px;
+    overflow-y: auto;
+    font-size: 0.62rem;
+    line-height: 1.7;
+    color: #7ab;
+    padding-right: 4px;
+  }
+
+  #hypothesisLog::-webkit-scrollbar { width: 4px; }
+  #hypothesisLog::-webkit-scrollbar-track { background: transparent; }
+  #hypothesisLog::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  .log-entry { border-left: 2px solid var(--border); padding-left: 6px; margin-bottom: 4px; }
+  .log-entry.warn { border-color: var(--accent2); color: #ffaa77; }
+  .log-entry.alert { border-color: #ff3060; color: #ff7090; }
+  .log-entry.good { border-color: var(--accent3); color: #90ee90; }
+  .log-entry.info { border-color: var(--accent4); color: #c0a0ff; }
+
+  /* Conductance trace */
+  #traceCanvas { width: 100%; height: 80px; }
+
+  .btn-row { display: flex; gap: 8px; margin-top: 10px; }
+
+  button {
+    flex: 1;
+    background: transparent;
+    border: 1px solid var(--accent);
+    color: var(--accent);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.65rem;
+    letter-spacing: 1px;
+    padding: 6px;
+    cursor: pointer;
+    border-radius: 3px;
+    transition: all 0.2s;
+    text-transform: uppercase;
+  }
+
+  button:hover { background: rgba(0,212,255,0.1); box-shadow: var(--glow); }
+  button.danger { border-color: #ff3060; color: #ff3060; }
+  button.danger:hover { background: rgba(255,48,96,0.1); }
+
+  .quantum-display {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 4px;
+    margin-top: 8px;
+  }
+
+  .q-unit {
+    height: 28px;
+    border-radius: 2px;
+    border: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.6rem;
+    transition: all 0.15s;
+  }
+
+  .annotation {
+    font-size: 0.6rem;
+    color: var(--dim);
+    line-height: 1.6;
+    margin-top: 8px;
+  }
+
+  .annotation span { color: var(--accent); }
+</style>
+</head>
+<body>
+<div class="container">
+
+<header>
+  <h1>GABA-A Quantum Turbine Model</h1>
+  <p>ATP-Synthase Rotary Logic · Stochastic Markov Gating · Allosteric Gear Simulation</p>
+</header>
+
+<div class="main-grid">
+
+  <!-- Top: Turbine + Spirograph -->
+  <div class="panel canvas-panel">
+    <div style="flex:1; min-width:0;">
+      <div class="panel-title">▸ Rotary Subunit Engine (ATP-Synthase Analogy)</div>
+      <canvas id="turbineCanvas" width="340" height="340"></canvas>
+      <div class="annotation">
+        5 subunits (2α·2β·1γ) as <span>gear elements</span>. M2 helix rotation ≈ pore gating.
+        Quantum tunneling probability modulates each subunit independently.
+      </div>
+    </div>
+    <div style="flex:1; min-width:0;">
+      <div class="panel-title">▸ Spirograph Output (Conductance Phase Space)</div>
+      <canvas id="spirographCanvas" width="300" height="300"></canvas>
+      <div class="annotation">
+        Each ligand modifies one <span>gear radius/direction</span>.
+        Curve complexity = allosteric coupling. Inverse agonist <span>reverses</span> gear direction.
+      </div>
+    </div>
+  </div>
+
+  <!-- Ligand Controls -->
+  <div class="panel">
+    <div class="panel-title">▸ Ligand Binding Controls</div>
+    <div class="controls-grid">
+      <div class="ligand-control">
+        <label style="color:var(--accent)">GABA [μM] — Primary Drive</label>
+        <input type="range" class="gaba" id="gabaSlider" min="0" max="100" value="30">
+        <div class="val" style="color:var(--accent)" id="gabaVal">30 μM</div>
+      </div>
+      <div class="ligand-control">
+        <label style="color:var(--accent4)">Benzodiazepine [nM] — Freq↑</label>
+        <input type="range" class="benzo" id="benzoSlider" min="0" max="100" value="0">
+        <div class="val" style="color:var(--accent4)" id="benzoVal">0 nM</div>
+      </div>
+      <div class="ligand-control">
+        <label style="color:var(--accent2)">Barbiturate [μM] — Dur↑</label>
+        <input type="range" class="barb" id="barbSlider" min="0" max="100" value="0">
+        <div class="val" style="color:var(--accent2)" id="barbVal">0 μM</div>
+      </div>
+      <div class="ligand-control">
+        <label style="color:var(--accent3)">Neurosteroid [nM] — Dual</label>
+        <input type="range" class="neuro" id="neuroSlider" min="0" max="100" value="0">
+        <div class="val" style="color:var(--accent3)" id="neuroVal">0 nM</div>
+      </div>
+      <div class="ligand-control">
+        <label style="color:#aaa">Zinc [μM] — Inhibitor</label>
+        <input type="range" class="zinc" id="zincSlider" min="0" max="100" value="0">
+        <div class="val" style="color:#aaa" id="zincVal">0 μM</div>
+      </div>
+      <div class="ligand-control">
+        <label style="color:#ff3060">Inverse Agonist — Reverse</label>
+        <input type="range" class="inverse" id="inverseSlider" min="0" max="100" value="0">
+        <div class="val" style="color:#ff3060" id="inverseVal">0 nM</div>
+      </div>
+    </div>
+
+    <div class="btn-row" style="margin-top:12px;">
+      <button onclick="preset('physiological')">Physiological</button>
+      <button onclick="preset('anesthesia')">Anesthesia</button>
+      <button onclick="preset('overdose')" class="danger">Overdose</button>
+      <button onclick="preset('anxiety')" class="danger">Anxiety/Inverse</button>
+      <button onclick="preset('reset')">Reset</button>
+    </div>
+  </div>
+
+  <!-- Metrics + State -->
+  <div class="panel">
+    <div class="panel-title">▸ Channel State Metrics</div>
+    <div class="metrics-grid">
+      <div class="metric">
+        <span class="label">OPEN PROB</span>
+        <span class="value" id="mPopen" style="color:var(--accent)">0.00</span>
+      </div>
+      <div class="metric">
+        <span class="label">Cl⁻ FLUX</span>
+        <span class="value" id="mFlux" style="color:var(--accent3)">0.0</span>
+      </div>
+      <div class="metric">
+        <span class="label">OPEN FREQ</span>
+        <span class="value" id="mFreq" style="color:var(--accent4)">0 Hz</span>
+      </div>
+      <div class="metric">
+        <span class="label">OPEN DUR</span>
+        <span class="value" id="mDur" style="color:var(--accent2)">0 ms</span>
+      </div>
+      <div class="metric">
+        <span class="label">DESENS (Markov D)</span>
+        <span class="value" id="mDesens" style="color:#888">0%</span>
+      </div>
+      <div class="metric">
+        <span class="label">Q-TUNNEL</span>
+        <span class="value" id="mQuantum" style="color:var(--accent5)">0.00</span>
+      </div>
+    </div>
+
+    <div style="margin-top:10px; font-size:0.58rem; color:var(--dim); font-style:italic;">
+      DESENS = Markov D-state fraction (authoritative). Updates each frame from kinetic rates.
+    </div>
+
+    <div style="margin-top:12px; font-size:0.62rem; color:var(--dim); letter-spacing:1px;">MARKOV STATE DISTRIBUTION</div>
+    <div class="state-bar" id="stateBar"></div>
+    <div class="state-labels" id="stateLabels"></div>
+
+    <div style="margin-top:12px; font-size:0.62rem; color:var(--accent4); letter-spacing:1px; font-weight:bold;">QUANTUM SUBUNIT STATES — α₁ α₂ β₁ β₂ γ</div>
+    <div style="font-size:0.56rem; color:var(--dim); margin-bottom:4px;">Yellow flash = quantum tunneling event on that subunit (WKB, ligand-independent)</div>
+    <div class="quantum-display" id="quantumDisplay"></div>
+
+    <div style="margin-top:12px; font-size:0.62rem; color:var(--dim); letter-spacing:1px; margin-bottom:4px;">Cl⁻ CONDUCTANCE TRACE</div>
+    <canvas id="traceCanvas" width="600" height="80"></canvas>
+  </div>
+
+  <!-- Hypothesis Log -->
+  <div class="panel" style="grid-column: 1 / -1;">
+    <div class="panel-title" style="display:flex; align-items:center; justify-content:space-between;">
+      <span>▸ Predictive Hypothesis Engine</span>
+      <span style="display:flex; gap:6px;">
+        <button id="pauseLogBtn" onclick="toggleLogPause()" style="font-size:0.6rem; padding:3px 10px; border-color:var(--accent5); color:var(--accent5);">⏸ Pause Log</button>
+        <button onclick="showAllHypotheses()" style="font-size:0.6rem; padding:3px 10px;">Show All 11</button>
+        <button onclick="clearLog()" style="font-size:0.6rem; padding:3px 10px; border-color:var(--dim); color:var(--dim);">Clear</button>
+      </span>
+    </div>
+    <div id="logPausedBanner" style="display:none; background:rgba(255,221,87,0.1); border:1px solid var(--accent5); border-radius:3px; padding:4px 8px; margin-bottom:6px; font-size:0.62rem; color:var(--accent5); letter-spacing:1px;">
+      ⏸ LOG PAUSED — simulation running. Press Resume to return to live mode.
+    </div>
+    <div id="hypothesisLog"></div>
+  </div>
+
+</div>
+</div>
+
+<script>
+// ============================================================
+// QUANTUM-STOCHASTIC GABA-A TURBINE MODEL
+// Unified ATP-Synthase rotary logic + Markov channel gating
+// + Quantum tunneling probability for conformational transitions
+// ============================================================
+
+// --- State ---
+const state = {
+  gaba: 30, benzo: 0, barb: 0, neuro: 0, zinc: 0, inverse: 0,
+  // Markov states: R(resting), B1(1 GABA bound), B2(2 GABA), O1(open brief), O2(open long), D(desensitized)
+  markov: { R: 0.7, B1: 0.15, B2: 0.08, O1: 0.04, O2: 0.02, D: 0.01 },
+  pOpen: 0,
+  clFlux: 0,
+  openFreq: 0,
+  openDur: 0,
+  desens: 0,
+  quantumProb: 0,
+  subunitAngles: [0, 72, 144, 216, 288], // degrees, 5 subunits
+  subunitVelocities: [0,0,0,0,0],
+  subunitQuantumState: [false,false,false,false,false],
+  spirographT: 0,
+  spirographPoints: [],
+  traceData: [],
+  time: 0,
+  lastHypothesisCheck: 0,
+  hypotheses: [],
+  logPaused: false
+};
+
+// --- Canvas setup ---
+const TC = document.getElementById('turbineCanvas');
+const SC = document.getElementById('spirographCanvas');
+const RC = document.getElementById('traceCanvas');
+const tctx = TC.getContext('2d');
+const sctx = SC.getContext('2d');
+const rctx = RC.getContext('2d');
+
+// Retina scaling
+function setupCanvas(canvas) {
+  const dpr = window.devicePixelRatio || 1;
+  const rect = canvas.getBoundingClientRect();
+  canvas.width = rect.width * dpr || canvas.width;
+  canvas.height = rect.height * dpr || canvas.height;
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+  return [ctx, rect.width || canvas.width/dpr, rect.height || canvas.height/dpr];
+}
+
+// --- Physics / Pharmacology Model ---
+
+function hill(conc, ec50, n) {
+  // Hill equation for dose-response
+  if (conc <= 0) return 0;
+  return Math.pow(conc, n) / (Math.pow(ec50, n) + Math.pow(conc, n));
+}
+
+function computeKinetics() {
+  const g = state.gaba;
+  const bz = state.benzo;
+  const bb = state.barb;
+  const ns = state.neuro;
+  const zn = state.zinc;
+  const inv = state.inverse;
+
+  // GABA occupancy via Hill (EC50=10μM, nH=1.5 for GABA-A)
+  const gabaOcc = hill(g, 10, 1.5);
+
+  // BZ: positive allosteric — increases open frequency (up to 4x)
+  const bzEffect = 1 + hill(bz, 20, 1) * 3.0;
+
+  // Barbiturate: prolongs open duration + direct gating at high conc
+  const bbDurEffect = 1 + hill(bb, 30, 1) * 5.0;
+  const bbDirectGate = hill(bb, 80, 2) * 0.3;
+
+  // Neurosteroid: both frequency and duration
+  const nsEffect = 1 + hill(ns, 15, 1.2) * 2.0;
+
+  // Zinc: global brake — reduces all rates
+  const znInhib = 1 - hill(zn, 10, 0.8) * 0.85;
+
+  // Inverse agonist: gear reversal — REDUCES Popen below baseline
+  const invEffect = 1 - hill(inv, 5, 1) * 1.2;
+
+  // QUANTUM TUNNELING: Fixed WKB probability — physically constant,
+  // independent of ligand binding (property of gate geometry only).
+  // Modulated very slightly by zinc (gate tension effect) but NOT by GABA.
+  const baseQuantumProb = 0.005;
+  const quantumTunnel = baseQuantumProb; // Fixed WKB probability — independent of ALL ligands and zinc
+  state.quantumProb = quantumTunnel;
+
+  // Base Popen from GABA occupancy
+  let pOpen = gabaOcc * 0.7;
+
+  // Apply modulators multiplicatively
+  pOpen = pOpen * bzEffect * nsEffect * Math.max(0, znInhib) * Math.max(-0.1, invEffect);
+  pOpen += bbDirectGate;   // barbiturate direct opening (GABA-independent at high dose)
+  pOpen += quantumTunnel;  // fixed quantum spontaneous contribution
+
+  // Clamp before desensitisation
+  pOpen = Math.max(0, Math.min(1, pOpen));
+  state.pOpen = pOpen;
+
+  // Update Markov states — single authoritative source for all display metrics
+  updateMarkov(gabaOcc, bzEffect, bbDurEffect, znInhib, invEffect, quantumTunnel);
+
+  // All metrics derived from Markov states for consistency
+  const mO = state.markov.O1 + state.markov.O2; // total open fraction
+
+  // Open frequency: BZ increases frequency; derived from open state + BZ gear
+  state.openFreq = mO * bzEffect * 60 * Math.max(0, znInhib);
+
+  // Open duration: Barb and NS prolong duration
+  state.openDur = 2 + mO > 0.001 ? bbDurEffect * nsEffect * 8 : 0;
+
+  // Cl- flux: Markov open fraction × duration × conductance scaling
+  // InvAg gear reversal: when invEffect < 0, flux explicitly suppressed below GABA-only baseline
+  const invSuppression = invEffect < 0 ? Math.max(0, 1 + invEffect) : 1.0;
+  state.clFlux = mO * 4.5 * bbDurEffect * Math.max(0, znInhib) * invSuppression;
+}
+
+function updateMarkov(gabaOcc, bzMult, bbMult, znInhib, invMult, qTunnel) {
+  const k1   = gabaOcc * 0.08 * znInhib;
+  const k_1  = 0.03;
+  const k2   = gabaOcc * 0.06 * znInhib;
+  const k_2  = 0.02;
+  const beta1  = 0.04 * bzMult * Math.max(0, invMult);
+  const alpha1 = 0.06 / bzMult;
+  const beta2  = 0.02 * bbMult;
+  const alpha2 = 0.08 / bbMult;
+  // Desensitisation driven by Markov open fraction — single consistent source
+  const openFrac = state.markov.O1 + state.markov.O2;
+  const kd = Math.max(0, openFrac - 0.05) * 0.06;
+  const kr = 0.004;
+  const qt = qTunnel * 0.5;
+
+  const m = state.markov;
+  const dR  = -k1*m.R + k_1*m.B1 + kr*m.D - qt*m.R;
+  const dB1 =  k1*m.R - k_1*m.B1 - k2*m.B1 + k_2*m.B2;
+  const dB2 =  k2*m.B1 - k_2*m.B2 - beta1*m.B2 - beta2*m.B2 + alpha1*m.O1 + alpha2*m.O2;
+  const dO1 =  beta1*m.B2 - alpha1*m.O1 - kd*m.O1 + qt*m.R;
+  const dO2 =  beta2*m.B2 - alpha2*m.O2 - kd*m.O2;
+  const dD  =  kd*(m.O1+m.O2) - kr*m.D;
+
+  m.R  = Math.max(0, m.R  + dR);
+  m.B1 = Math.max(0, m.B1 + dB1);
+  m.B2 = Math.max(0, m.B2 + dB2);
+  m.O1 = Math.max(0, m.O1 + dO1);
+  m.O2 = Math.max(0, m.O2 + dO2);
+  m.D  = Math.max(0, m.D  + dD);
+
+  // Renormalize
+  const sum = m.R+m.B1+m.B2+m.O1+m.O2+m.D;
+  if (sum > 0) { for (let k in m) m[k] /= sum; }
+}
+
+function updateSubunitPhysics() {
+  // Each subunit is a gear element
+  // GABA drives rotation; modulators change each gear's behavior
+  const baseOmega = state.pOpen * 3.0; // rad/s equivalent
+  const bzDir = state.benzo > 0 ? 1 : 0;
+  const invDir = state.inverse > 0 ? -1 : 0; // REVERSES gear
+
+  for (let i = 0; i < 5; i++) {
+    // Quantum fluctuation: each subunit has independent tunneling probability
+    const qFlip = Math.random() < state.quantumProb * 2;
+    state.subunitQuantumState[i] = qFlip;
+
+    let omega = baseOmega;
+
+    // Correct arrangement: a1(0), b2(1), a1(2), b2(3), g2(4)
+    // a1 subunits (0,2): GABA primary drive; BZ via g2 coupling
+    if (i === 0 || i === 2) omega *= (1 + bzDir * state.benzo/80); // mild BZ effect via coupling
+    // b2 subunits (1,3): GABA + barbiturate site
+    if (i === 1 || i === 3) omega *= (1 + state.barb/60);
+    // g2 subunit (4): BZ eccentric gear + neurosteroid; InvAg reverses THIS gear
+    if (i === 4) omega *= (1 + state.benzo/40 + state.neuro/50);
+
+    // Zinc slows all subunits
+    omega *= Math.max(0.1, 1 - state.zinc/120);
+
+    // Quantum kick
+    if (qFlip) omega += (Math.random() - 0.5) * 2.0;
+
+    state.subunitVelocities[i] = omega;
+    state.subunitAngles[i] += omega * 0.8 + (invDir * state.inverse > 0 ? -omega * 1.5 : 0);
+    state.subunitAngles[i] %= 360;
+  }
+}
+
+// --- Drawing ---
+
+function drawTurbine() {
+  const W = 340, H = 340;
+  tctx.clearRect(0, 0, W, H);
+
+  const cx = W/2, cy = H/2;
+  const outerR = 120, innerR = 35;
+
+  // Background glow when open
+  if (state.pOpen > 0.05) {
+    const grd = tctx.createRadialGradient(cx, cy, 0, cx, cy, outerR);
+    grd.addColorStop(0, `rgba(0,212,255,${state.pOpen * 0.15})`);
+    grd.addColorStop(1, 'transparent');
+    tctx.fillStyle = grd;
+    tctx.beginPath();
+    tctx.arc(cx, cy, outerR, 0, Math.PI*2);
+    tctx.fill();
+  }
+
+  // Correct pentameric arrangement (clockwise, extracellular view):
+  // a1(0deg) - b2(72deg) - a1(144deg) - b2(216deg) - g2(288deg)
+  // Counterclockwise = g2-b2-a1-b2-a1 (structural consensus)
+  // GABA sites: a1-b2 interfaces (0-1 and 2-3)
+  // BZ site: a1-g2 interface (0-4)
+  const colors = ['#00d4ff','#ff6b35','#00d4ff','#ff6b35','#c87eff'];
+  const labels = ['α₁','β₂','α₁','β₂','γ₂'];
+  const isGamma = [false, false, false, false, true];
+
+  // Draw 5 subunit gears
+  for (let i = 0; i < 5; i++) {
+    const baseAngle = (i * 72 - 90) * Math.PI/180;
+    const gearCx = cx + Math.cos(baseAngle) * 78;
+    const gearCy = cy + Math.sin(baseAngle) * 78;
+    const gearR = 28;
+    const teeth = 8;
+    const ang = state.subunitAngles[i] * Math.PI/180;
+
+    // Quantum glow
+    if (state.subunitQuantumState[i]) {
+      tctx.save();
+      tctx.shadowColor = '#ffdd57';
+      tctx.shadowBlur = 12;
+      tctx.strokeStyle = '#ffdd57';
+      tctx.lineWidth = 1;
+      tctx.beginPath();
+      tctx.arc(gearCx, gearCy, gearR + 4, 0, Math.PI*2);
+      tctx.stroke();
+      tctx.restore();
+    }
+
+    tctx.save();
+    tctx.translate(gearCx, gearCy);
+    tctx.rotate(ang);
+
+    if (isGamma[i]) {
+      // γ drawn as ELLIPSE to show structural eccentricity/tilt
+      tctx.beginPath();
+      tctx.ellipse(0, 0, gearR + 6, gearR - 6, Math.PI/6, 0, Math.PI*2);
+      tctx.fillStyle = `${colors[i]}22`;
+      tctx.strokeStyle = colors[i];
+      tctx.lineWidth = 2;
+      tctx.fill();
+      tctx.stroke();
+      // Ellipse teeth approximation — dashes around perimeter
+      for (let t = 0; t < teeth; t++) {
+        const ta = (t / teeth) * Math.PI * 2;
+        const rx = gearR + 6, ry = gearR - 6;
+        const ex = rx * Math.cos(ta), ey = ry * Math.sin(ta);
+        const nx = Math.cos(ta), ny = Math.sin(ta);
+        tctx.beginPath();
+        tctx.moveTo(ex, ey);
+        tctx.lineTo(ex + nx*7, ey + ny*7);
+        tctx.strokeStyle = colors[i];
+        tctx.lineWidth = 2;
+        tctx.stroke();
+      }
+    } else {
+      // α and β drawn as CIRCLES
+      tctx.beginPath();
+      for (let t = 0; t < teeth * 2; t++) {
+        const a = (t / (teeth * 2)) * Math.PI * 2;
+        const r = t % 2 === 0 ? gearR : gearR - 6;
+        if (t === 0) tctx.moveTo(Math.cos(a)*r, Math.sin(a)*r);
+        else tctx.lineTo(Math.cos(a)*r, Math.sin(a)*r);
+      }
+      tctx.closePath();
+      tctx.fillStyle = `${colors[i]}22`;
+      tctx.strokeStyle = colors[i];
+      tctx.lineWidth = 1.5;
+      tctx.fill();
+      tctx.stroke();
+    }
+
+    // M2 helix indicator
+    tctx.strokeStyle = colors[i];
+    tctx.lineWidth = 2;
+    tctx.beginPath();
+    tctx.moveTo(0, 0);
+    tctx.lineTo(0, -gearR + 6);
+    tctx.stroke();
+
+    // Label
+    tctx.fillStyle = colors[i];
+    tctx.font = '13px Share Tech Mono';
+    tctx.textAlign = 'center';
+    tctx.fillText(labels[i], 0, gearR + 14);
+
+    tctx.restore();
+
+    // Connecting rod to center
+    tctx.save();
+    tctx.strokeStyle = `${colors[i]}33`;
+    tctx.lineWidth = 1;
+    tctx.setLineDash([3,3]);
+    tctx.beginPath();
+    tctx.moveTo(gearCx, gearCy);
+    tctx.lineTo(cx, cy);
+    tctx.stroke();
+    tctx.setLineDash([]);
+    tctx.restore();
+  }
+
+  // GABA site labels (α-β interfaces)
+  tctx.font = '7px Share Tech Mono';
+  tctx.fillStyle = 'rgba(0,212,255,0.5)';
+  tctx.textAlign = 'center';
+  // α1-β2 midpoint
+  const a1x = cx + Math.cos(-90*Math.PI/180)*78, a1y = cy + Math.sin(-90*Math.PI/180)*78;
+  const b2x = cx + Math.cos(-18*Math.PI/180)*78, b2y = cy + Math.sin(-18*Math.PI/180)*78;
+  tctx.fillText('GABA', (a1x+b2x)/2, (a1y+b2y)/2);
+  // α2-β3 midpoint
+  const a2x = cx + Math.cos(54*Math.PI/180)*78, a2y = cy + Math.sin(54*Math.PI/180)*78;
+  const b3x = cx + Math.cos(126*Math.PI/180)*78, b3y = cy + Math.sin(126*Math.PI/180)*78;
+  tctx.fillText('GABA', (a2x+b3x)/2, (a2y+b3y)/2);
+  // α1-γ BZ site
+  const gx = cx + Math.cos(198*Math.PI/180)*78, gy = cy + Math.sin(198*Math.PI/180)*78;
+  tctx.fillStyle = 'rgba(200,126,255,0.6)';
+  tctx.fillText('BZ', (a1x+gx)/2, (a1y+gy)/2);
+
+  // Central pore
+  const poreR = innerR * (0.3 + state.pOpen * 0.7);
+  const poreGrd = tctx.createRadialGradient(cx, cy, 0, cx, cy, innerR);
+  poreGrd.addColorStop(0, `rgba(0,212,255,${0.1 + state.pOpen * 0.6})`);
+  poreGrd.addColorStop(0.5, `rgba(0,150,200,${state.pOpen * 0.3})`);
+  poreGrd.addColorStop(1, 'transparent');
+  tctx.beginPath();
+  tctx.arc(cx, cy, innerR, 0, Math.PI*2);
+  tctx.fillStyle = poreGrd;
+  tctx.fill();
+  tctx.strokeStyle = `rgba(0,212,255,${0.3 + state.pOpen * 0.7})`;
+  tctx.lineWidth = 2;
+  tctx.stroke();
+
+  // Pore diameter annotation
+  tctx.fillStyle = '#00d4ff';
+  tctx.font = '9px Share Tech Mono';
+  tctx.textAlign = 'center';
+  const poreA = (2 + state.pOpen * 3).toFixed(1);
+  tctx.fillText(`${poreA}Å`, cx, cy + 4);
+
+  // Cl- ions flowing through if open
+  if (state.pOpen > 0.15) {
+    const nIons = Math.floor(state.pOpen * 6);
+    for (let i = 0; i < nIons; i++) {
+      const ionT = (state.time * 0.05 + i/nIons) % 1;
+      const ionY = cy - innerR + ionT * innerR * 2;
+      const ionX = cx + (Math.random() < 0.5 ? -1 : 1) * Math.random() * 4;
+      tctx.beginPath();
+      tctx.arc(ionX, ionY, 3, 0, Math.PI*2);
+      tctx.fillStyle = `rgba(127,255,107,${0.6 + Math.random()*0.4})`;
+      tctx.fill();
+      tctx.fillStyle = '#fff';
+      tctx.font = '6px Share Tech Mono';
+      tctx.textAlign = 'center';
+      tctx.fillText('Cl⁻', ionX, ionY+2);
+    }
+  }
+
+  // Title overlay
+  tctx.fillStyle = 'rgba(0,212,255,0.4)';
+  tctx.font = '9px Share Tech Mono';
+  tctx.textAlign = 'left';
+  tctx.fillText(`Popen: ${state.pOpen.toFixed(3)}`, 8, 18);
+  tctx.fillText(`Desens(D): ${(state.markov.D*100).toFixed(1)}%`, 8, 30);
+}
+
+function drawSpirograph() {
+  const W = 300, H = 300;
+  const cx = W/2, cy = H/2;
+
+  // Fade old drawing
+  sctx.fillStyle = 'rgba(2,8,16,0.03)';
+  sctx.fillRect(0, 0, W, H);
+
+  // Gear radii determined by ligands
+  const R1 = 80;
+  const r2 = 20 + state.gaba * 0.4;
+  const r3 = state.benzo * 0.3;
+  const r4 = state.barb * 0.2;
+  const r5 = state.neuro * 0.15;
+
+  const invDir = state.inverse > 0 ? -1 : 1;
+  const t = state.spirographT;
+
+  // Multi-gear spirograph
+  const x = cx
+    + R1 * Math.cos(t)
+    + r2 * Math.cos(invDir * t * 3.1 + state.subunitAngles[0]*Math.PI/180)
+    + r3 * Math.cos(t * 7.3 + state.subunitAngles[4]*Math.PI/180)
+    + r4 * Math.cos(t * 2.7)
+    + r5 * Math.cos(t * 5.1);
+
+  const y = cy
+    + R1 * Math.sin(t)
+    + r2 * Math.sin(invDir * t * 3.1 + state.subunitAngles[0]*Math.PI/180)
+    + r3 * Math.sin(t * 7.3 + state.subunitAngles[4]*Math.PI/180)
+    + r4 * Math.sin(t * 2.7)
+    + r5 * Math.sin(t * 5.1);
+
+  state.spirographPoints.push({x, y, p: state.pOpen});
+  if (state.spirographPoints.length > 800) state.spirographPoints.shift();
+
+  // Draw trail
+  for (let i = 1; i < state.spirographPoints.length; i++) {
+    const pt = state.spirographPoints[i];
+    const pt0 = state.spirographPoints[i-1];
+    const alpha = (i / state.spirographPoints.length) * 0.7;
+    const hue = state.inverse > 20 ? 340 : (state.barb > 20 ? 20 : 190);
+    sctx.strokeStyle = `hsla(${hue}, 80%, 60%, ${alpha * 0.6})`;
+    sctx.lineWidth = 1;
+    sctx.beginPath();
+    sctx.moveTo(pt0.x, pt0.y);
+    sctx.lineTo(pt.x, pt.y);
+    sctx.stroke();
+  }
+
+  // Current pen
+  sctx.beginPath();
+  sctx.arc(x, y, 3, 0, Math.PI*2);
+  sctx.fillStyle = state.pOpen > 0.3 ? '#00d4ff' : '#c87eff';
+  sctx.fill();
+
+  state.spirographT += 0.025 + state.pOpen * 0.02;
+}
+
+function drawTrace() {
+  const W = RC.width / (window.devicePixelRatio||1);
+  const H = RC.height / (window.devicePixelRatio||1);
+  rctx.clearRect(0, 0, W, H);
+
+  // Background
+  rctx.fillStyle = '#020810';
+  rctx.fillRect(0, 0, W, H);
+
+  // Grid
+  rctx.strokeStyle = 'rgba(13,58,82,0.5)';
+  rctx.lineWidth = 0.5;
+  for (let i = 0; i <= 4; i++) {
+    const y = H * i/4;
+    rctx.beginPath(); rctx.moveTo(0, y); rctx.lineTo(W, y); rctx.stroke();
+  }
+
+  state.traceData.push(state.clFlux);
+  if (state.traceData.length > W) state.traceData.shift();
+
+  // Draw conductance trace
+  rctx.beginPath();
+  rctx.strokeStyle = '#00d4ff';
+  rctx.lineWidth = 1.5;
+  for (let i = 0; i < state.traceData.length; i++) {
+    const x = i;
+    const y = H - (state.traceData[i] / 5.0) * (H - 8) - 4;
+    if (i === 0) rctx.moveTo(x, y);
+    else rctx.lineTo(x, y);
+  }
+  rctx.stroke();
+
+  // Desensitization overlay
+  if (state.markov.D > 0.1) {
+    rctx.fillStyle = `rgba(255,107,53,${state.markov.D * 0.2})`;
+    rctx.fillRect(0, 0, W, H);
+  }
+
+  // Labels
+  rctx.fillStyle = 'rgba(0,212,255,0.4)';
+  rctx.font = '8px Share Tech Mono';
+  rctx.fillText('Cl⁻ flux (pA)', 4, 10);
+  rctx.fillText('5pA', W-28, 10);
+  rctx.fillText('0', W-28, H-3);
+}
+
+function updateStateBar() {
+  const m = state.markov;
+  const states = [
+    { key:'R',  color:'#1a4060', label:'Resting' },
+    { key:'B1', color:'#2060a0', label:'1×GABA' },
+    { key:'B2', color:'#4090c0', label:'2×GABA' },
+    { key:'O1', color:'#00d4ff', label:'Open1' },
+    { key:'O2', color:'#00ffcc', label:'Open2' },
+    { key:'D',  color:'#ff6b35', label:'Desens' }
+  ];
+
+  const bar = document.getElementById('stateBar');
+  const labels = document.getElementById('stateLabels');
+  bar.innerHTML = '';
+  labels.innerHTML = '';
+
+  states.forEach(s => {
+    const seg = document.createElement('div');
+    seg.className = 'state-seg';
+    seg.style.background = s.color;
+    seg.style.width = (m[s.key] * 100) + '%';
+    seg.style.minWidth = m[s.key] > 0.005 ? '2px' : '0';
+    bar.appendChild(seg);
+
+    const lbl = document.createElement('span');
+    lbl.innerHTML = `<span class="state-dot" style="background:${s.color}"></span>${s.label} ${(m[s.key]*100).toFixed(0)}%`;
+    labels.appendChild(lbl);
+  });
+}
+
+function updateQuantumDisplay() {
+  const qd = document.getElementById('quantumDisplay');
+  qd.innerHTML = '';
+  const labels2 = ['α₁','β₂','α₁','β₂','γ₂'];
+  const colors = ['#00d4ff','#00d4ff','#ff6b35','#ff6b35','#c87eff'];
+  for (let i = 0; i < 5; i++) {
+    const el = document.createElement('div');
+    el.className = 'q-unit';
+    const isOpen = state.markov.O1 + state.markov.O2 > 0.05 && Math.random() < state.pOpen;
+    const qActive = state.subunitQuantumState[i];
+    el.style.borderColor = qActive ? '#ffdd57' : colors[i] + '60';
+    el.style.background = qActive ? 'rgba(255,221,87,0.15)' : (isOpen ? colors[i]+'20' : 'transparent');
+    el.style.color = qActive ? '#ffdd57' : colors[i];
+    el.textContent = labels2[i];
+    qd.appendChild(el);
+  }
+}
+
+function updateMetrics() {
+  document.getElementById('mPopen').textContent = state.pOpen.toFixed(3);
+  document.getElementById('mFlux').textContent = state.clFlux.toFixed(2) + ' pA';
+  document.getElementById('mFreq').textContent = state.openFreq.toFixed(1) + ' Hz';
+  document.getElementById('mDur').textContent = state.openDur.toFixed(1) + ' ms';
+  // DESENS now reads directly from Markov D state — single authoritative source
+  document.getElementById('mDesens').textContent = (state.markov.D * 100).toFixed(1) + '%';
+  document.getElementById('mQuantum').textContent = state.quantumProb.toExponential(2);
+}
+
+// --- Hypothesis Engine ---
+function checkHypotheses() {
+  const t = state.time;
+  if (t - state.lastHypothesisCheck < 60) return;
+  state.lastHypothesisCheck = t;
+
+  const g = state.gaba, bz = state.benzo, bb = state.barb;
+  const ns = state.neuro, zn = state.zinc, inv = state.inverse;
+  const po = state.pOpen;
+
+  const log = (msg, type='info') => {
+    if (state.logPaused) return; // log paused — discard live entries
+    const el = document.createElement('div');
+    el.className = `log-entry ${type}`;
+    // Pharmacological state tag — immediately interpretable condition fingerprint
+    const tag = `GABA=${state.gaba}\u03bcM | BZ=${state.benzo} | Barb=${state.barb} | Popen=${state.pOpen.toFixed(2)}`;
+    el.innerHTML = `<span style="color:var(--dim);font-size:0.58rem;">[${tag}]</span><br>${msg}`;
+    const logEl = document.getElementById('hypothesisLog');
+    logEl.insertBefore(el, logEl.firstChild);
+    if (logEl.children.length > 40) logEl.removeChild(logEl.lastChild);
+  };
+
+  const ds = state.markov.D; // authoritative: Markov D-state fraction
+
+  // ── H1: BZ+Barb synergy (fires for both anesthesia and overdose) ──────────
+  if (bz > 40 && bb > 40 && po > 0.6) {
+    log('HYPOTHESIS: BZ\u2013barbiturate synergy \u2014 Popen >' + po.toFixed(2) + '. Cl\u207b flux = frequency \u00d7 duration \u00d7 conductance: multiplicative gear engagement. Epicycloid shows dense overlapping pattern. Synergy index >2.0 predicted. Risk: respiratory depression.', 'alert');
+  }
+
+  // ── H2: Desensitization tolerance — Markov D state, with open frequency ───
+  if (ds > 0.48 && g > 20) {
+    const freqStr = state.openFreq.toFixed(1);
+    log('HYPOTHESIS: Desensitization (Markov D) >' + (ds*100).toFixed(0) + '% \u2014 tolerance developing. Open frequency ' + freqStr + ' Hz with sustained GABA. Gear\u2013pore coupling decouples despite ligand occupancy. Models BZ tolerance on chronic use.', 'warn');
+  }
+
+  // ── H3: Anaesthesia-specific: high open frequency flagged separately ───────
+  // Note: threshold >8 Hz is a floor — at anaesthesia preset, frequency is ~40-50 Hz
+  if (bz > 40 && bb > 20 && state.openFreq > 8) {
+    log('HYPOTHESIS: Open frequency ' + state.openFreq.toFixed(1) + ' Hz \u2014 sustained high-frequency gating under anaesthesia. BZ accelerates \u03b3-gear (frequency); Barb extends arc (duration). Both gears simultaneously engaged \u2014 multiplicative Cl\u207b flux increase.', 'warn');
+  }
+
+  // ── H4: Quantum tunneling spontaneous openings ────────────────────────────
+  if (state.quantumProb > 0.015 && g < 10) {
+    log('HYPOTHESIS: Quantum tunneling (WKB) dominates at low GABA \u2014 P_tunnel \u2248 exp(\u22122\u221a(2m\u0394E)\u00b7d/\u210f). Spontaneous sub-threshold openings model ligand-independent mIPSC. Turbine precesses without main drive gear engaged.', 'info');
+  }
+
+  // ── H5: Baseline quantum tunneling (physiological/reset context) ──────────
+  if (g < 5 && bz < 5 && bb < 5 && state.quantumProb > 0 && po < 0.05) {
+    const qtPct = (state.quantumProb * 100).toFixed(2);
+    log('HYPOTHESIS: Near-zero ligand conditions. Quantum tunneling contributes ~' + qtPct + '% of total openings at L9\u2019 gate via London dispersion force-shielded hydrophobic pocket. WKB pathway \u2014 non-Arrhenius prediction: rate falls less steeply at low T (upward Arrhenius deviation).', 'info');
+  }
+
+  // ── H6: Inverse agonist gear reversal ────────────────────────────────────
+  if (inv > 30 && po < 0.05) {
+    log('HYPOTHESIS: InvAg reverses \u03b3-subunit gear (CCW). Popen suppressed below resting baseline \u2192 anxiogenic/proconvulsant state. Winding number sign: +1 \u2192 \u22121. Mirror-image epicycloid. Predicts new short closed-state dwell time (Prediction 2).', 'alert');
+  }
+
+  // ── H7: Neurosteroid catamenial model ────────────────────────────────────
+  if (ns > 60 && bz < 5) {
+    log('HYPOTHESIS: High NS without BZ \u2014 dual freq+duration gear enhancement. Models allopregnanolone surge in luteal phase. Voltage-dependent tooth engagement. Predicts catamenial seizure protection independent of BZ site.', 'good');
+  }
+
+  // ── H8: Zinc partial block ────────────────────────────────────────────────
+  if (zn > 50 && g > 50) {
+    log('HYPOTHESIS: Zinc partial block at high GABA \u2014 incomplete inhibition as GABA occupancy outcompetes zinc at \u03b1-\u03b2 interface. Global brake partially overridden by primary drive gear. Predicts voltage-dependent relief of zinc block.', 'warn');
+  }
+
+  // ── H9: Direct barbiturate gating (overdose / high barb) ─────────────────
+  if (bb > 75 && g < 5) {
+    log('HYPOTHESIS: Barbiturate direct gating without GABA \u2014 axle rotates without drive gear engagement. Models anaesthetic overdose mechanism (narrow therapeutic index). k_direct = Hill([B], EC50_high, 2)\u00d70.3. No GABA required.', 'alert');
+  }
+
+  // ── H10: Pure BZ selectivity (anxiolytic without sedation) ───────────────
+  if (bz > 50 && bb < 5 && ns < 5) {
+    log('HYPOTHESIS: Pure BZ effect \u2014 \u03b1-subunit eccentric gear acceleration only. Frequency \u2191 without duration change. Predicts subtype-selective anxiolysis (\u03b12/\u03b13) without sedation (\u03b11) at low occupancy. Phase portrait: higher-frequency same-handedness loops.', 'good');
+  }
+
+  // ── H11: alpha5 tonic inhibition model ───────────────────────────────────
+  if (g < 20 && g > 5 && bz < 5 && bb < 5 && po > 0.05) {
+    log('HYPOTHESIS: Low ambient GABA \u2014 models \u03b15 subtype tonic inhibition regime. \u03b15 gear predicted: slower angular velocity, larger arc, longer open duration. Distinct phase portrait from \u03b11 (phasic) subtype. Prediction 3 condition.', 'info');
+  }
+}
+
+// --- Presets ---
+// RESET      : all ligands zero — blank canvas, only quantum tunneling remains
+// PHYSIOLOGICAL : resting inhibitory tone — ambient GABA, endogenous NS, tonic zinc
+function preset(name) {
+  const sets = {
+    physiological: { gaba:15, benzo:0, barb:0, neuro:10, zinc:5, inverse:0 },
+    anesthesia:    { gaba:80, benzo:60, barb:40, neuro:20, zinc:0, inverse:0 },
+    overdose:      { gaba:100, benzo:100, barb:90, neuro:0, zinc:0, inverse:0 },
+    anxiety:       { gaba:10, benzo:0, barb:0, neuro:0, zinc:0, inverse:70 },
+    reset:         { gaba:0, benzo:0, barb:0, neuro:0, zinc:0, inverse:0 }
+  };
+  const s = sets[name];
+  if (!s) return;
+  state.gaba = s.gaba; state.benzo = s.benzo; state.barb = s.barb;
+  state.neuro = s.neuro; state.zinc = s.zinc; state.inverse = s.inverse;
+  state.markov = { R:0.9, B1:0.05, B2:0.03, O1:0.01, O2:0.005, D:0.005 };
+  state.spirographPoints = [];
+  state.lastHypothesisCheck = 0; // force immediate hypothesis check
+
+  // Immediate contextual log on preset selection
+  const logEl = document.getElementById('hypothesisLog');
+  const el = document.createElement('div');
+  const presetMsgs = {
+    reset:         { cls:'info',  msg:'RESET: All ligands zeroed. Blank canvas — only quantum tunneling (WKB) spontaneous openings remain at L9\u2019 gate. Explore manually from here.' },
+    physiological: { cls:'good',  msg:'PHYSIOLOGICAL: Resting inhibitory tone. GABA=15\u03bcM (ambient synaptic), NS=10nM (endogenous allopregnanolone), Zinc=5\u03bcM (tonic). Quantum tunneling contributes ~0.5% of total openings at resting baseline.' },
+    anesthesia:    { cls:'warn',  msg:'ANAESTHESIA: High GABA + BZ + Barb + NS. Expect Popen >0.6. Monitor open frequency (Hz) and desensitization % — both will rise. Barb prolongs duration; BZ increases frequency; combined effect is multiplicative.' },
+    overdose:      { cls:'alert', msg:'OVERDOSE: Saturating GABA + BZ + Barb. BZ\u2013Barb multiplicative synergy (freq\u00d7dur\u00d7conductance) drives Cl\u207b flux toward ceiling. Desensitization will develop rapidly despite high Popen. Respiratory depression mechanism.' },
+    anxiety:       { cls:'alert', msg:'ANXIETY/InvAg: \u03b3-gear reversal active. Popen suppressed below resting baseline. Winding orientation reversed (CCW; winding number \u22121). Mirror-image epicycloid. Anxiogenic / proconvulsant state.' },
+  };
+  const pm = presetMsgs[name];
+  if (pm) {
+    el.className = `log-entry ${pm.cls}`;
+    el.textContent = `[PRESET \u25b6 ${name.toUpperCase()}] ${pm.msg}`;
+    logEl.insertBefore(el, logEl.firstChild);
+    if (logEl.children.length > 40) logEl.removeChild(logEl.lastChild);
+  }
+
+  ['gaba','benzo','barb','neuro','zinc','inverse'].forEach(k => {
+    const el = document.getElementById(k+'Slider');
+    if (el) { el.value = state[k]; updateSlider(el, k); }
+  });
+}
+
+function updateSlider(el, name) {
+  const val = parseFloat(el.value);
+  state[name] = val;
+  const pct = (val/100*100)+'%';
+  el.style.setProperty('--pct', pct);
+  const units = {gaba:'μM', benzo:'nM', barb:'μM', neuro:'nM', zinc:'μM', inverse:'nM'};
+  document.getElementById(name+'Val').textContent = val + ' ' + (units[name]||'');
+}
+
+// --- Event listeners ---
+['gaba','benzo','barb','neuro','zinc','inverse'].forEach(name => {
+  const el = document.getElementById(name+'Slider');
+  el.addEventListener('input', () => updateSlider(el, name));
+  updateSlider(el, name);
+});
+
+// --- Main loop ---
+let lastTime = 0;
+function loop(ts) {
+  const dt = ts - lastTime;
+  lastTime = ts;
+  if (dt < 100) { // skip huge gaps
+    state.time++;
+    computeKinetics();
+    updateSubunitPhysics();
+    drawTurbine();
+    drawSpirograph();
+    drawTrace();
+    updateStateBar();
+    updateQuantumDisplay();
+    updateMetrics();
+    checkHypotheses();
+  }
+  requestAnimationFrame(loop);
+}
+
+// --- Log pause / resume ---
+function toggleLogPause() {
+  state.logPaused = !state.logPaused;
+  const btn = document.getElementById('pauseLogBtn');
+  const banner = document.getElementById('logPausedBanner');
+  if (state.logPaused) {
+    btn.textContent = '\u25b6 Resume Log';
+    btn.style.borderColor = 'var(--accent3)';
+    btn.style.color = 'var(--accent3)';
+    banner.style.display = 'block';
+  } else {
+    btn.textContent = '\u23f8 Pause Log';
+    btn.style.borderColor = 'var(--accent5)';
+    btn.style.color = 'var(--accent5)';
+    banner.style.display = 'none';
+  }
+}
+
+// --- Clear log ---
+function clearLog() {
+  document.getElementById('hypothesisLog').innerHTML = '';
+  if (state.logPaused) toggleLogPause();
+}
+
+// --- Show All 11 Hypotheses — auto-pauses log so list stays readable ---
+function showAllHypotheses() {
+  if (!state.logPaused) toggleLogPause();
+  const logEl = document.getElementById('hypothesisLog');
+  logEl.innerHTML = '';
+
+  const all = [
+    { cls:'info',  label:'H1',  trigger:'BZ>40 + Barb>40 + Popen>0.6',
+      text:'BZ\u2013Barb synergy: multiplicative Cl\u207b flux = freq\u00d7dur\u00d7conductance. Synergy index >2.0 (theoretically derived). Dense overlapping epicycloid. Risk: respiratory depression.' },
+    { cls:'warn',  label:'H2',  trigger:'Markov D>48% + GABA>20\u03bcM',
+      text:'Desensitization (Markov D) >48% with sustained GABA. Also reports open frequency (Hz). Gear\u2013pore coupling decouples despite ligand occupancy. Models BZ tolerance on chronic use.' },
+    { cls:'warn',  label:'H3',  trigger:'BZ>40 + Barb>20 + open freq>8 Hz',
+      text:'Anaesthesia: open frequency typically ~40\u201350 Hz at anaesthesia preset (threshold floor = 8 Hz). BZ = frequency gear; Barb = duration gear. Both simultaneously engaged \u2014 multiplicative Cl\u207b flux.' },
+    { cls:'info',  label:'H4',  trigger:'Q-tunnel prob>0.015 + GABA<10\u03bcM',
+      text:'Quantum tunneling (WKB) dominates at low GABA. Spontaneous L9\u2019 gate openings model ligand-independent mIPSC. Turbine precesses without main drive gear engaged.' },
+    { cls:'info',  label:'H5',  trigger:'GABA<5 + BZ<5 + Barb<5 (Reset / Physiological)',
+      text:'Baseline quantum tunneling: reports exact % of total openings from WKB pathway. Non-Arrhenius prediction: rate falls LESS steeply at low T (upward Arrhenius deviation). London dispersion force shielding at L9\u2019.' },
+    { cls:'alert', label:'H6',  trigger:'InvAg>30 + Popen<0.05',
+      text:'\u03b3-gear reversal (CCW). Popen suppressed below resting baseline. Winding number sign: +1\u2192\u22121. Mirror-image epicycloid. Anxiogenic/proconvulsant. Predicts new short closed-state dwell time \u03c4_c2 (Prediction 2).' },
+    { cls:'good',  label:'H7',  trigger:'NS>60 + BZ<5  [move Neuro slider >60]',
+      text:'High NS without BZ: dual freq+duration gear enhancement. Models allopregnanolone surge in luteal phase. Voltage-dependent tooth engagement. Catamenial seizure protection \u2014 BZ-independent.' },
+    { cls:'warn',  label:'H8',  trigger:'Zinc>50 + GABA>50  [move both sliders]',
+      text:'Zinc partial block at high GABA \u2014 primary drive gear outcompetes global brake at \u03b1-\u03b2 interface. Predicts voltage-dependent relief of zinc block.' },
+    { cls:'alert', label:'H9',  trigger:'Barb>75 + GABA<5  [high Barb, zero GABA]',
+      text:'Barbiturate direct gating without GABA. Axle rotates without drive gear. k_direct = Hill([B], EC50_high, 2)\u00d70.3. Models narrow therapeutic index of barbiturates vs benzodiazepines.' },
+    { cls:'good',  label:'H10', trigger:'BZ>50 + Barb<5 + NS<5  [BZ only]',
+      text:'Pure BZ: eccentric \u03b3-gear acceleration only. Frequency \u2191 without duration change. \u03b12/\u03b13 selectivity predicts anxiolysis without \u03b11 sedation at low occupancy. Phase portrait: higher-freq same-handedness loops.' },
+    { cls:'info',  label:'H11', trigger:'GABA 5\u201320\u03bcM + BZ<5 + Barb<5  [low GABA only]',
+      text:'\u03b15 tonic inhibition regime. \u03b15 gear predicted: slower angular velocity, larger arc, longer open duration vs \u03b11 phasic subtype. Distinct epicycloid portrait. Prediction 3 condition (HEK293 recombinant test).' },
+  ];
+
+  const header = document.createElement('div');
+  header.className = 'log-entry info';
+  header.style.cssText = 'border-color:var(--accent);font-weight:bold;color:var(--accent);font-size:0.68rem;';
+  header.textContent = '\u2550\u2550 ALL 11 HYPOTHESES \u2014 trigger conditions in brackets \u2014 Log paused. Press Resume Log to return to live mode. \u2550\u2550';
+  logEl.appendChild(header);
+
+  all.forEach(h => {
+    const el = document.createElement('div');
+    el.className = `log-entry ${h.cls}`;
+    el.style.marginBottom = '3px';
+    el.innerHTML =
+      `<span style="font-size:0.72rem;font-weight:bold;">[${h.label}]</span>` +
+      `&nbsp;<span style="color:var(--dim);font-size:0.59rem;font-style:italic;">fires when: ${h.trigger}</span>` +
+      `<br><span style="font-size:0.63rem;">${h.text}</span>`;
+    logEl.appendChild(el);
+  });
+}
+
+// --- Init log ---
+function initLog() {
+  const log = document.getElementById('hypothesisLog');
+  const entry = document.createElement('div');
+  entry.className = 'log-entry info';
+  entry.textContent = '[INIT] Quantum-stochastic turbine model initialized. 5-subunit Markov system active. Adjust ligands to observe emergent predictions.';
+  log.appendChild(entry);
+}
+
+initLog();
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
